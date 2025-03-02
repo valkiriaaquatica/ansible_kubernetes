@@ -1,0 +1,69 @@
+version: '3'
+
+env:
+  VENV_DIR: "ansible_enviroment" 
+  ANSIBLE_COLLECTIONS_PATH: "~/.ansible/collections" # directory of the user 
+
+tasks:
+  check_install_python3: 
+    desc: "Checks and if not installs Python3"
+    cmds: 
+        - sudo apt install python3
+  check_pip: 
+    desc: "Checks is pip is installed and if not installs it in the controller machine" # assume most of the distros have python3 installed
+    cmds:   
+      -  sudo apt install -y python3-pip curl
+  create_pyenv: 
+    desc: "Creates python enviroemt to run ansible commands"
+    cmds:   
+      -  python3 -m venv {{.VENV_DIR}}
+
+  install_ansible_deps: 
+    desc: "Install Ansible dependancies needed in the Ansible contrller machine"
+    cmds:   
+      - bash -c "source {{.VENV_DIR}}/bin/activate && pip install ansible"
+      - bash -c "source {{.VENV_DIR}}/bin/activate && ANSIBLE_COLLECTIONS_PATH={{.ANSIBLE_COLLECTIONS_PATH}} ansible-galaxy collection install kubernetes.core"
+      - bash -c "source {{.VENV_DIR}}/bin/activate && pip install -r {{.ANSIBLE_COLLECTIONS_PATH}}/ansible_collections/kubernetes/core/requirements.txt"
+      - bash -c "source {{.VENV_DIR}}/bin/activate  && ansible-galaxy collection install git+https://github.com/k3s-io/k3s-ansible.git"
+
+  install_kubectl_in_this_controller_machine: 
+    desc: "Install Kubectl and k9S in the Ansible controller machine"
+    cmds:
+      - bash -c 'cd /tmp && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl'
+
+  install_helm_in_this_controller_machine: 
+    desc: "Install Kubectl and k9S in the Ansible controller machine (this is not 100% necessary because we use Ansible to install things, but it's usefull in case needed)"
+    cmds:
+      - bash -c 'cd /tmp && curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh'
+
+  install_k9s_in_this_controller_machine:
+    desc: "Install k9s in the Ansible controller machine"
+    cmds:
+      - bash -c 'cd /tmp && curl -sSLo k9s.tar.gz https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz && tar -xzf k9s.tar.gz && sudo mv k9s /usr/local/bin/ && rm k9s.tar.gz'
+
+  configure_k3s_cluster:
+    desc: "Configures the k3s cluster using the offical k3s role"
+    cmds: 
+      - bash -c 'source {{.VENV_DIR}}/bin/activate && cd k3s-ansible && ansible-playbook -i inventory.yml playbooks/site.yml -v'
+  install_applications_in_the_cluster:
+    desc: "This install in the ready deployed cluster: A HTTP app, a PostgreSQL and the Prometheus Stack"
+    cmds:
+      - bash -c 'source {{.VENV_DIR}}/bin/activate && ansible-playbook installation_apps/main.yaml -v'
+    
+  run_k9s: 
+    desc: "Opens K9S to easy interact with the cluster and see what has been done"
+    cmds: 
+      - k9s
+  setup_and_deploy:
+    desc: "Calls all the task to be run"
+    cmds:
+      - task: check_install_python3
+      - task: check_pip
+      - task: create_pyenv
+      - task: install_ansible_deps
+      - task: install_kubectl_in_this_controller_machine
+      - task: install_helm_in_this_controller_machine
+      - task: install_k9s_in_this_controller_machine
+      - task: configure_k3s_cluster
+      - task: install_applications_in_the_cluster
+      - task: run_k9s

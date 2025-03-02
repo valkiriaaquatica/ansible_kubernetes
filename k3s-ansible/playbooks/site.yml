@@ -1,0 +1,50 @@
+---
+- name: Cluster prep
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  roles:
+    - role: prereq
+    - role: airgap
+    - role: raspberrypi
+
+- name: Setup K3S server
+  hosts: server
+  become: true
+  roles:
+    - role: k3s_server
+
+- name: Setup K3S agent
+  hosts: agent
+  become: true
+  roles:
+    - role: k3s_agent
+
+- name: Fetch kubeconfig from master
+  hosts: server
+  become: true
+  tasks:
+    - name: Copy kubeconfig to local machine
+      fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ lookup('env','HOME') }}/.kube/k3s_config.yaml"
+        flat: yes
+      tags: 
+        - kuebcofig
+
+- name: Update kubeconfig with master IP
+  hosts: localhost
+  tasks:
+    - name: debug of master ndoe IP 
+      debug: 
+        msg: "{{ groups['server'][0] }}"
+      tags:
+        - kubeconfig_change_ip
+
+    - name: Replace localhost with master IP in kubeconfig
+      ansible.builtin.replace:
+        path: "{{ lookup('env','HOME') }}/.kube/k3s_config.yaml"
+        regexp: 'server: https://127\.0\.0\.1:6443'
+        replace: "server: https://{{ groups['server'][0] }}:6443"
+      tags:
+        - kubeconfig_change_ip

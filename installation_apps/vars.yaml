@@ -1,0 +1,16 @@
+app_http:
+  name: "httpapp"
+  chart_path: "httpapp"
+  namespace: "httpapp"
+
+app_postgresql:
+  name: "postgresql"
+  chart_ref: "oci://registry-1.docker.io/bitnamicharts/postgresql"
+  namespace: "postgresql"
+  values_file: "postgresql/values.yaml"
+
+app_kube_prometheus:
+  name: "kube-prometheus-stack"
+  chart_ref: "prometheus-community/kube-prometheus-stack"
+  namespace: "kube-prometheus-stack"
+  values_file: "kube-prometheus-stack/values.yaml"

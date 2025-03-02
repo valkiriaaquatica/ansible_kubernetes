@@ -1,0 +1,36 @@
+- name: Add Bitnami Helm repository
+  kubernetes.core.helm_repository:
+    name: "bitnami"
+    repo_url: "https://charts.bitnami.com/bitnami"
+  tags: helm_repo
+
+- name: Install postgres with multiple replicas
+  kubernetes.core.helm:
+    name: "{{ app_postgresql.name }}"
+    chart_ref: "{{ app_postgresql.chart_ref }}"
+    release_namespace: "{{ app_postgresql.namespace }}"
+    create_namespace: true
+    values_files: "{{ app_postgresql.values_file }}"
+  tags: installation, postgresql
+
+- name: Wait for 30 seconds for the PostgreSQL pods to start
+  pause:
+    seconds: 30
+  tags: verify, postgresql
+
+- name: Verify postgres deployment - Get pods
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ app_postgresql.namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/instance={{ app_postgresql.name }}"
+  register: postgresql_pods
+  tags: verify, postgresql
+
+- name: Assert postgres pods are running
+  assert:
+    that:
+      - postgresql_pods.resources | length > 0
+      - (postgresql_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list) | length > 0
+  tags: verify, postgresql

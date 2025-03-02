@@ -1,0 +1,36 @@
+- name: Add prometheus-community helm repo
+  kubernetes.core.helm_repository:
+    name: "prometheus-community"
+    repo_url: "https://prometheus-community.github.io/helm-charts"
+  tags: helm_repo
+
+- name: Install Prometheus stack
+  kubernetes.core.helm:
+    name: "{{ app_kube_prometheus.name }}"
+    chart_ref: "{{ app_kube_prometheus.chart_ref }}"
+    release_namespace: "{{ app_kube_prometheus.namespace }}"
+    create_namespace: true
+    values_files: "{{ app_kube_prometheus.values_file }}"
+  tags: installation, kube-prometheus-stack
+
+- name: Wait for 30 seconds for the kube-prometheus-stack pods to start
+  pause:
+    seconds: 30
+  tags: verify, kube-prometheus-stack
+
+- name: Verify kube-prometheus-stacs Get pods
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ app_kube_prometheus.namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/instance={{ app_kube_prometheus.name }}"
+  register: kube_prometheus_stack_pods
+  tags: verify, kube-prometheus-stack
+
+- name: Assert kube-prometheus-stack pods are running
+  assert:
+    that:
+      - kube_prometheus_stack_pods.resources | length > 0
+      - (kube_prometheus_stack_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list) | length > 0
+  tags: verify, kube-prometheus-stack

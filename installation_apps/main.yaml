@@ -1,0 +1,25 @@
+- name: Install apps and verify thir installation
+  hosts: localhost
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ lookup('env','HOME') }}/.kube/k3s_config.yaml"
+  tasks:
+    - name: Include global variables used
+      ansible.builtin.include_vars:
+        file: ./vars.yaml
+
+    - name: Deploy the http appp
+      ansible.builtin.include_tasks:
+        file: ./deploy_http.yaml
+      tags: http
+
+    - name: Deploy postgres with multiple replicas
+      ansible.builtin.include_tasks:
+        file: ./deploy_postgres.yaml
+      tags: postgresql
+
+    - name: Deploy prometheus stack
+      ansible.builtin.include_tasks:
+        file: ./deploy_prometheus-stack.yaml
+      tags: prometheus
+

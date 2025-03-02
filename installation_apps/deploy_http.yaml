@@ -1,0 +1,29 @@
+- name: Deploy HTTP app and create namespace
+  kubernetes.core.helm:
+    name: "{{ app_http.name }}"
+    chart_ref: "{{ app_http.chart_path }}"
+    release_namespace: "{{ app_http.namespace }}"
+    create_namespace: true
+  tags: installation, http
+
+- name: Wait for 30 seconds for the HTTP app pods to start
+  pause:
+    seconds: 30
+  tags: verify, https
+
+- name: Verify HTTP app deployment - Get pods
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ app_http.namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/instance={{ app_http.name }}"
+  register: httpapp_pods
+  tags: verify, http
+
+- name: Assert HTTP app pods are running
+  assert:
+    that:
+      - httpapp_pods.resources | length > 0
+      - (httpapp_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list) | length > 0
+  tags: verify, http
